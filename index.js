@@ -7,17 +7,18 @@ const PRUNE_INTERVAL_MS = 60 * 1000;
 const HASH_SEED = 0xABCD;
 
 class Filru {
-  constructor(dir, maxBytes, loadFunc) {
+  constructor({ dir, maxBytes, loadFunc, useBuffer }) {
     if (!dir || typeof dir !== 'string') {
       throw new TypeError('filru: dir is invalid');
     }
     if (!maxBytes || typeof maxBytes !== 'number' || maxBytes < 1) {
       throw new TypeError('filru: maxBytes must be a number greater than 0');
     }
+    this.stopped = false;
     this.dir = dir;
     this.maxBytes = maxBytes;
-    this.stopped = false;
     this.load = loadFunc;
+    this.useBuffer = useBuffer;
 
     this._timeout = null;
   }
@@ -51,11 +52,28 @@ class Filru {
     }
   }
 
-  get(key) {
+  get(key, useBuffer = false) {
     const h = Filru.hash(key);
     const fullpath = this.dir + '/' + h;
     return new Promise((resolve, reject) => {
-      fs.readFile(fullpath, (err, buffer) => {
+      if (this.useBuffer || useBuffer) {
+        fs.readFile(fullpath, (err, buffer) => {
+          if (err) {
+            if (err.code === 'ENOENT' && this.load) {
+              debug('get soft fail, will load:', { key, fullpath });
+              return this.load(key);
+            }
+            debug('get fail', { key, fullpath, err });
+            reject(err);
+            return;
+          }
+          this.touch(key);
+          resolve(buffer);
+        });
+        return;
+      }
+
+      fs.access(fullpath, fs.constants.F_OK, (err) => {
         if (err) {
           if (err.code === 'ENOENT' && this.load) {
             debug('get soft fail, will load:', { key, fullpath });
@@ -65,8 +83,9 @@ class Filru {
           reject(err);
           return;
         }
+        const stream = fs.createReadStream(fullpath);
         this.touch(key);
-        resolve(buffer);
+        resolve(stream);
       });
     });
   }
