@@ -73,7 +73,7 @@ class Filru {
         return;
       }
 
-      fs.access(fullpath, fs.constants.F_OK, (err) => {
+      fs.stat(fullpath, (err, stats) => {
         if (err) {
           if (err.code === 'ENOENT' && this.load) {
             debug('get soft fail, will load:', { key, fullpath });
@@ -84,6 +84,7 @@ class Filru {
           return;
         }
         const stream = fs.createReadStream(fullpath);
+        stream.length = stats.size;
         this.touch(key);
         resolve(stream);
       });
