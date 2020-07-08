@@ -2,7 +2,13 @@
 
 A disk based LRU cache. Nothing is kept in memory. This has the benefit of persisting across application restarts.
 
-Initially intended to be a simplistic caching layer for frequent HTTP requests, since OS file system caching is much faster than doing a network request.
+The cache is constrained by size (bytes) and optionally by file age.
+
+## Use Cases
+
+- a simplistic caching layer for frequent HTTP requests, since OS file system caching is much faster than doing a network request
+- caching the results of labor intensive actions
+- caching slow operations across multiple network requests
 
 ## Usage
 
@@ -21,7 +27,8 @@ const handleErr = (err) => {
 };
 
 const maxBytes = 50 * 1024 * 1024; // 50 megabytes
-const f = new Filru('/tmp/filru', maxBytes);
+const maxAge = 24 * 60 * 60 * 1000; // 1 day
+const f = new Filru({ dir: '/tmp/filru', maxBytes, maxAge });
 
 // optionally add a load function for when an object
 // is not found in the cache
